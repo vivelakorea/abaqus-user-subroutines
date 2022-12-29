@@ -23,10 +23,10 @@ C=======================================================================
 
 C     DIMENSION DEFINITION
       REAL*8 E_MOD, E_NU, HARD_PARAM(3), HILL_PARAM(6), 
-     1       CE(6,6), CE_INV(6,6), eqstress, eqstress0, eqstrain, 
+     1       CE(6,6), CE_INV(6,6), eqstress, eqstress0, EQSTRAIN, 
      2       ystress, hard_mod, dfds(6), ddfdss(6,6), f, dlam, ddlam, 
      3       stress0(6), cur_stress(6), residual(6), Qmat(6,6),
-     4       Qmat_INV(6,6), dstress(6), stress_tolerance,
+     4       Qmat_INV(6,6), dstress(6), stress_tolerance, ALGMOD(6,6),
      5       UNITFOURTH(6,6), tmp6(6), tmp66(6,6), tmp3(3), tmp33(3,3)
 
       INTEGER itmp6(6)
@@ -53,14 +53,18 @@ C     ELASTIC PROPERTIES
       E_MOD = PROPS(1)
       E_NU = PROPS(2)
 
-C     HARDENING PARAMETERS (SIGMA = H1 + H2(1 - exp(H3*epsilon)))
+C     HARDENING PARAMETERS (SIGMA = H1 + H2(1 - exp(-H3*epsilon)))
       HARD_PARAM(1:3) = PROPS(3:5)
       
 C     HILL'S YIELD FUNCTION
       HILL_PARAM(1:6) = PROPS(6:11)
 
+      ! if (KINC .eq. 1) then
+      !   STATEV(1)=0.D0
+      ! endif
+
 C     EQUIVALENT PLASTIC STRAIN
-      eqstrain = STATEV(1)
+      EQSTRAIN = STATEV(1)
 
 C=======================================================================
 C========                ELASTIC GUESS                        ==========
@@ -118,85 +122,94 @@ C     elastic guess
 C=======================================================================
 C========              PLASTICITY CHECK                       ==========
 C=======================================================================
+
+      call HILL48(stress, HILL_PARAM, dfds, ddfdss, eqstress)
+      call VOCE(EQSTRAIN, HARD_PARAM, ystress, hard_mod)
+
+      f = eqstress - ystress
+
+      eqstress0 = eqstress
+    
+
+      stress_tolerance = eqstress0*TOLER
+
       
-    !   call HILL48(stress, HILL_PARAM, 
-    !  $            dfds, ddfdss, eqstress)
-    !   call VOCE(eqstrain, HARD_PARAM, 
-    !  $          ystress, hard_mod)
 
-    !   f = eqstress - ystress
+      if (f .gt. stress_tolerance) then
+        
+C       ================================================================
+C       ========              RETURN MAPPING                  ==========
+C       ================================================================
+        stress0(1:6) = stress(1:6)
+        eqstress0 = eqstress  
+! 
+        dlam = ZERO
+        cur_stress(1:6) = stress(1:6)
 
-    !   eqstress0 = eqstress
+        
+        do while ((f .gt. stress_tolerance) .or. 
+     $  (.not.(all(abs(residual) .lt. stress_tolerance))))
+
+          
+          call HILL48(cur_stress, HILL_PARAM, dfds, ddfdss, eqstress)
+          
+! 
+          Qmat = UNITFOURTH + dlam*matmul(CE, ddfdss)
+! 
+          call MATINV(Qmat, 6, 6, itmp6, Qmat_INV)
+! 
+          call VOCE(EQSTRAIN, HARD_PARAM, ystress, hard_mod)
+! 
+          f = eqstress - ystress
+! 
+          residual(1:6) = cur_stress - 
+     $                       (stress0 - dlam*matmul(CE, dfds))
+! 
+          ddlam = (f - dot_product(dfds, matmul(Qmat_INV, residual)))
+     $    /(dot_product(dfds, matmul(Qmat_INV, matmul(CE, dfds))) + 
+     $                                                       hard_mod)
+! 
+          dstress = -matmul(Qmat_INV, residual) - 
+     $                 ddlam*matmul(matmul(Qmat_INV, CE), dfds)
+! 
+          dlam = dlam + ddlam
+          cur_stress = cur_stress + dstress
+          EQSTRAIN = EQSTRAIN + ddlam
+! 
+        enddo
+
+        
+      
+        stress(1:6) = cur_stress(1:6)
+
       
 
-    !   stress_tolerance = eqstress0*TOLER
+C       ================================================================
+C       ======                    DDSDDE                           =====
+C       ================================================================
 
-!       if (f .gt. stress_tolerance) then
-! C       ==============================================================
-! C       ========              RETURN MAPPING                  ========
-! C       ==============================================================
-!         stress0(1:6) = stress
-!         eqstress0 = eqstress  
-
-!         dlam = ZERO
-!         cur_stress(1:6) = stress
-
-!         do while ((f .gt. stress_tolerance) .or. 
-!      $  (.not.(all(abs(residual) .lt. stress_tolerance))))
-
-
-!           call HILL48(cur_stress, HILL_PARAM, dfds, ddfdss, eqstress)
-
-!           Qmat = UNITFOURTH + dlam*matmul(CE, ddfdss)
-
-!           call MATINV(Qmat, 6, 6, itmp6, Qmat_INV)
-
-!           call VOCE(eqstrain, HARD_PARAM, ystress, hard_mod)
-
-!           f = eqstress - ystress
-
-!           residual(1:6) = cur_stress - 
-!      $                       (stress0 - dlam*matmul(CE, dfds))
-
-!           ddlam = (f - dot_product(dfds, matmul(Qmat_INV, r)))
-!      $    /(dot_product(dfds, matmul(Qmat_INV, matmul(CE, dfds))) + 
-!      $                                                       hard_mod
-
-!           dstress = -matmul(Qmat_INV, residual) - 
-!      $                 ddlam*matmul(matmul(Qmat_INV, CE), dfds)
-
-!           cur_stress = cur_stress + dstress
-
-!         enddo
-
-!         eqstrain = eqstrain + dlam
-!         stress = cur_stress
-!       endif
-
-! C=====================================================================
-! C========                    DDSDDE                           ========
-! C=====================================================================
-
-    !   call HILL48(stress, HILL_PARAM, dfds, ddfdss, eqstress)
-    !   tmp6 = matmul(CE, dfds)
-    !   call DYADIC(tmp6, tmp6, tmp66)
-    !   DDSDDE(1:6,1:6) = CE - 
-    !  $                 (tmp66)/(dot_product(dfds, tmp6))
-
-
-! C=====================================================================
-! C========                PASS STATE VARIABLES                 ========
-! C=====================================================================
+        call HILL48(stress, HILL_PARAM, dfds, ddfdss, eqstress)
+        
+        CALL ALGO_MOD(CE_INV, dlam, ddfdss, algmod)
+        tmp6 = matmul(algmod, dfds)
+        call DYADIC(tmp6, tmp6, tmp66)
+        DDSDDE(1:6,1:6) = algmod - (tmp66)/
+     &                           (dot_product(dfds, tmp6) )
+       
+      endif
+C=====================================================================
+C========                PASS STATE VARIABLES                 ========
+C=====================================================================
       
-      ! statev(1) = eqstrain
+      STATEV(1) = EQSTRAIN
       
       RETURN
       END
 
 
-C!!!!!!!!                 END OF UMAT                         !!!!!!!!!
-C!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-C!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+C!!!!!!!!                 END OF UMAT                         !!!!!!!!!!
+C!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+C!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
 
@@ -211,13 +224,14 @@ C======================================================================
 C========               YIELD FUNCTION                        =========
 C======================================================================
 
-      SUBROUTINE HILL48(STRESS, HILL_PARAM
-     $                  dfds, ddfdss, EQSTRESS)
+      SUBROUTINE HILL48(STRESS, HILL_PARAM, dfds, ddfdss, EQSTRESS)
       
         REAL*8 STRESS(6), HILL_PARAM(6), 
      $          dfds(6), ddfdss(6,6), EQSTRESS
         PARAMETER (ZERO=0.D0, ONE=1.D0, TWO=2.D0)
 
+
+        
         EQSTRESS = SQRT(
      $                   HILL_PARAM(1)*(STRESS(2) - STRESS(3))**TWO +
      $                   HILL_PARAM(2)*(STRESS(3) - STRESS(1))**TWO + 
@@ -226,18 +240,26 @@ C======================================================================
      $                   TWO*HILL_PARAM(5)*STRESS(5)**TWO +
      $                   TWO*HILL_PARAM(6)*STRESS(4)**TWO
      $                 )
+
+
+      dfds(1:6) = 0.d0
+      ddfdss(1:6,1:6) = 0.d0
+
+      if(EQSTRESS.GT.1.d-6) then
       
         dfds(1) = ONE/EQSTRESS
      $   *(-HILL_PARAM(2)*(STRESS(3) - STRESS(1)) 
      $       + HILL_PARAM(3)*(STRESS(1) - STRESS(2)))
-
+      
+      
+      
         dfds(2) = ONE/EQSTRESS
      $   *( HILL_PARAM(1)*(STRESS(2) - STRESS(3)) 
      $       - HILL_PARAM(3)*(STRESS(1) - STRESS(2)))
 
         dfds(3) = ONE/EQSTRESS
      $   *(-HILL_PARAM(1)*(STRESS(2) - STRESS(3)) 
-     $       + -HILL_PARAM(2)*(STRESS(3) - STRESS(1)))
+     $       + HILL_PARAM(2)*(STRESS(3) - STRESS(1)))
 
         dfds(4) = ONE/EQSTRESS*(TWO*HILL_PARAM(6)*STRESS(4))
         dfds(5) = ONE/EQSTRESS*(TWO*HILL_PARAM(5)*STRESS(5))
@@ -249,18 +271,20 @@ C======================================================================
           enddo
         enddo
 
-        ddfdss(1,1) = HILL_PARAM(2) + HILL_PARAM(3)
-        ddfdss(2,2) = HILL_PARAM(1) + HILL_PARAM(3)
-        ddfdss(3,3) = HILL_PARAM(1) + HILL_PARAM(2)
-        ddfdss(1,2) = -HILL_PARAM(3)
-        ddfdss(2,1) = -HILL_PARAM(3)
-        ddfdss(1,3) = -HILL_PARAM(2)
-        ddfdss(3,1) = -HILL_PARAM(2)
-        ddfdss(2,3) = -HILL_PARAM(1)
-        ddfdss(3,2) = -HILL_PARAM(1)
-        ddfdss(4,4) = TWO*HILL_PARAM(6)
-        ddfdss(5,5) = TWO*HILL_PARAM(5)
-        ddfdss(6,6) = TWO*HILL_PARAM(4)
+        ddfdss(1,1) =  ONE/EQSTRESS*(HILL_PARAM(2) + HILL_PARAM(3))
+        ddfdss(2,2) =  ONE/EQSTRESS*(HILL_PARAM(1) + HILL_PARAM(3))
+        ddfdss(3,3) =  ONE/EQSTRESS*(HILL_PARAM(1) + HILL_PARAM(2))
+        ddfdss(1,2) =  ONE/EQSTRESS*(-HILL_PARAM(3))
+        ddfdss(2,1) =  ONE/EQSTRESS*(-HILL_PARAM(3))
+        ddfdss(1,3) =  ONE/EQSTRESS*(-HILL_PARAM(2))
+        ddfdss(3,1) =  ONE/EQSTRESS*(-HILL_PARAM(2))
+        ddfdss(2,3) =  ONE/EQSTRESS*(-HILL_PARAM(1))
+        ddfdss(3,2) =  ONE/EQSTRESS*(-HILL_PARAM(1))
+        ddfdss(4,4) =  ONE/EQSTRESS*(TWO*HILL_PARAM(6))
+        ddfdss(5,5) =  ONE/EQSTRESS*(TWO*HILL_PARAM(5))
+        ddfdss(6,6) =  ONE/EQSTRESS*(TWO*HILL_PARAM(4))
+
+      endif
  
       RETURN
       END SUBROUTINE
@@ -269,9 +293,7 @@ C======================================================================
 C=======================================================================
 C========       isotropic hardening function                  ==========
 C=======================================================================
-      SUBROUTINE VOCE(eqstrain, HARD_PARAM,
-     $                ystress, hard_mod) ! yield stress
-
+      SUBROUTINE VOCE(eqstrain, HARD_PARAM, ystress, hard_mod) 
         REAL*8 eqstrain, HARD_PARAM(3),!SIGMA = H1 + H2(1-exp(H3*epsilon
      $         ystress
         PARAMETER (ZERO=0.D0, ONE=1.D0, TWO=2.D0)
@@ -285,11 +307,26 @@ C=======================================================================
       END SUBROUTINE
 
 C=======================================================================
+C========               algorithmic moduli                    ==========
+C=======================================================================
+
+      SUBROUTINE ALGO_MOD(CE_INV, DLAM, DDFDSS, ALGMOD)
+        REAL*8 CE_INV(6,6), DLAM, DDFDSS(6,6), ALGMOD(6,6), TMP(6,6)
+        INTEGER ITMP(6,6)
+
+        TMP(1:6,1:6) = CE_INV + DLAM*DDFDSS
+        CALL MATINV(TMP, 6, 6, ITMP, ALGMOD)
+       
+      RETURN
+      END SUBROUTINE
+
+        
+
+C=======================================================================
 C========              matrix manipulations                   ==========
 C=======================================================================
 
-      SUBROUTINE DYADIC(A, B,
-     $                  C)
+      SUBROUTINE DYADIC(A, B, C)
       
         REAL*8 A(6), B(6),
      $         C(6,6)
