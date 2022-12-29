@@ -61,7 +61,7 @@
 ** 
 *Material, name=Material-1
 *Depvar
-      1,
+      2,
 *User Material, constants=11
 200000.,   0.3,  149., 208.7,  12.1,   0.5,   0.5,   0.5
    1.5,   1.5,   1.5
@@ -94,7 +94,11 @@ LOAD, 2, 2, 0.5
 ** 
 ** FIELD OUTPUT: F-Output-1
 ** 
-*Output, field, variable=PRESELECT
+*Output, field
+*Node Output
+RF, U
+*Element Output, directions=YES
+LE, PE, PEEQ, S, SDV
 ** 
 ** HISTORY OUTPUT: H-Output-1
 ** 
