@@ -145,9 +145,11 @@ C       ================================================================
         cur_stress(1:6) = stress(1:6)
 
         
-        do while ((abs(f) .gt. stress_tolerance) .or. 
-     $  (.not.(all(abs(residual) .lt. stress_tolerance))))
-
+        do while ( 
+     $             (abs(f) .gt. stress_tolerance) 
+     $             .or. 
+     $             (.not. (all(abs(residual) .lt. stress_tolerance)))
+     $           )
           
           call HILL48(cur_stress, HILL_PARAM, dfds, ddfdss, eqstress)
           
@@ -183,7 +185,13 @@ C       ================================================================
           ! write(*,*) ddlam
           ! write(*,*) f
           ! write(*,*) residual
-          
+
+          if ((iter .gt. NEWTON) .or. (abs(f) .gt. eqstress0*1.D1)) then
+            PNEWDT = ONE/TWO
+            ! write(*,*) 'reduce time increment'
+            goto 666
+          endif
+
           iter = iter + 1
         enddo
 
@@ -210,8 +218,8 @@ C=====================================================================
       
       STATEV(1) = eqstrain
       STATEV(2) = iter
-
-      RETURN
+  
+  666 RETURN
       END
 
 
