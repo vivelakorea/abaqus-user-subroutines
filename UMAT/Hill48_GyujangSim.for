@@ -5,9 +5,9 @@ C institute : Seoul National University
 C             Mechanics of Materials Laboratory
 C             https://sites.google.com/view/snumml/home
 C reference : [1] M. A. Crisfield, "Non-linear Finite Element Analysis
-C                 of Solids and Structures"
+C                 of Solids and Structures" Ch 6.6.6
 C             [2] J. C. Simo, T. J. R. Hudges, "Computational 
-C                 Inelasticity"
+C                 Inelasticity" Ch 3.6.2
 CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
 
       INCLUDE 'utils.for'
