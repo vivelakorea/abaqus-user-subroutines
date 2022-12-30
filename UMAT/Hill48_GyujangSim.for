@@ -1,3 +1,15 @@
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+C writen by : Gyujang Sim
+C date      : 2022/12/30
+C institute : Seoul National University 
+C             Mechanics of Materials Laboratory
+C             https://sites.google.com/view/snumml/home
+C reference : [1] M. A. Crisfield, "Non-linear Finite Element Analysis
+C                 of Solids and Structures"
+C             [2] J. C. Simo, T. J. R. Hudges, "Computational 
+C                 Inelasticity"
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+
       INCLUDE 'utils.for'
 
 C!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -136,7 +148,7 @@ C=======================================================================
       if (f .gt. stress_tolerance) then
         iter = 1
 C       ================================================================
-C       ========              RETURN MAPPING                  ==========
+C       ========              RETURN MAPPING  [1]             ==========
 C       ================================================================
         stress0(1:6) = stress(1:6)
         eqstress0 = eqstress  
@@ -180,7 +192,7 @@ C       ================================================================
           ! write(*,*) 'new iter'
           ! write(*,*) iter
           ! write(*,*) stress0 
-          ! write(*,*) curstress          
+          ! write(*,*) cur_stress          
           ! write(*,*) dlam
           ! write(*,*) ddlam
           ! write(*,*) f
@@ -200,7 +212,7 @@ C       ================================================================
         stress(1:6) = cur_stress(1:6)
 
 C       ================================================================
-C       ======                    DDSDDE                           =====
+C       ======                    DDSDDE [2]                       =====
 C       ================================================================
 
         call HILL48(stress, HILL_PARAM, dfds, ddfdss, eqstress)
