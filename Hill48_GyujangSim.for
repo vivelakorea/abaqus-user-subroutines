@@ -33,7 +33,7 @@ C     DIMENSION DEFINITION
 
 C     PARAMETER
       PARAMETER(ZERO=0.D0, ONE=1.D0, TWO=2.D0, THREE=3.D0, SIX=6.D0, 
-     1 NEWTON=100, TOLER=1.0D-10)
+     1 NEWTON=100, TOLER=1.0D-6)
 
       do i = 1,6
         do j = 1,6
@@ -70,7 +70,7 @@ C     EQUIVALENT PLASTIC STRAIN
 C=======================================================================
 C========                ELASTIC GUESS                        ==========
 C=======================================================================
-
+      write(*,*) 'SSIBALSSIBALSSIBALSSIBALSSIBALSSIBALSSIBALSSIBAL'
 C     ELASTIC STIFFNESS
 
       do i=1,6
@@ -154,7 +154,7 @@ C       ================================================================
   
           call MATINV(Qmat, 6, 6, itmp6, Qmat_INV)
   
-          call VOCE(EQSTRAIN, HARD_PARAM, ystress, hard_mod)
+          call VOCE(EQSTRAIN+dlam, HARD_PARAM, ystress, hard_mod)
   
           f = eqstress - ystress
   
@@ -167,9 +167,20 @@ C       ================================================================
 
           dstress = -matmul(Qmat_INV, residual) - 
      $                 ddlam*matmul(matmul(Qmat_INV, CE), dfds)
-! 
+
+          
           dlam = dlam + ddlam
+          
           cur_stress = cur_stress + dstress
+
+          ! write(*,*) 'new iter'
+          ! write(*,*) iter
+          ! write(*,*) stress0 
+          ! write(*,*) curstress          
+          ! write(*,*) dlam
+          ! write(*,*) ddlam
+          ! write(*,*) f
+          ! write(*,*) residual
           
           iter = iter + 1
         enddo
@@ -177,8 +188,6 @@ C       ================================================================
         eqstrain = eqstrain + dlam
       
         stress(1:6) = cur_stress(1:6)
-
-      
 
 C       ================================================================
 C       ======                    DDSDDE                           =====

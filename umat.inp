@@ -71,7 +71,7 @@
 ** 
 *Step, name=Step-1, nlgeom=YES
 *Static
-1., 1., 1e-05, 1.
+0.01, 1., 0.01, 0.01
 ** 
 ** BOUNDARY CONDITIONS
 ** 
@@ -86,7 +86,7 @@ YSYMM, YSYMM
 ZSYMM, ZSYMM
 ** Name: BC-4 Type: Displacement/Rotation
 *Boundary, amplitude=Amp-1
-LOAD, 2, 2, 0.5
+LOAD, 2, 2, 0.1
 ** 
 ** OUTPUT REQUESTS
 ** 
